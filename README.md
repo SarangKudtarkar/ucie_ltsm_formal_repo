@@ -20,6 +20,8 @@ flowchart TD
   JG --> R3[reports/*.rpt]
 ```
 
+
+
 ## Structure
 
 ```
@@ -78,12 +80,16 @@ NAK/replay, with a free single-bit error injector on the link.
 - Covers: error in data bits, error in CRC bits, corrupt then replayed delivery,
   tracked flit delivered after an error, two flits back to back.
 
+![JasperGold property table-flit](jaspergold_flit_coverage.png)
+
 ## Run
 
 ```
 jg -no_gui -tcl scripts/ucie_ltsm_formal.tcl
 jg -no_gui -tcl scripts/ucie_flit_formal.tcl
 ```
+
+![JasperGold property table-ltsm](jaspergold_ltsm_coverage.png)
 
 Older installs: `jaspergold -no_gui -tcl scripts/<script>.tcl`.
 
