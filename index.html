@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UCIe LTSM Formal Interactive Series</title>
+<meta name="description" content="Interactive walkthrough of formal verification for a UCIe link training state machine (forward progress) and a CRC/replay flit path (data integrity) with JasperGold.">
+<style>
+:root{
+  --bg:#0b1020; --panel:#121a33; --panel2:#18224a; --line:#2a3566;
+  --text:#e6ebff; --muted:#8f9bc0; --accent:#5eead4; --accent2:#fbbf24;
+  --blue:#60a5fa; --pink:#f472b6; --bad:#f87171; --good:#4ade80;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--accent)}
+nav{position:sticky;top:0;z-index:10;background:rgba(11,16,32,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;align-items:center}
+nav b{margin-right:10px;font-size:14px;letter-spacing:.04em}
+nav a{color:var(--muted);text-decoration:none;font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid transparent}
+nav a:hover{color:var(--text);border-color:var(--line)}
+header.hero{padding:56px 16px 24px;max-width:1000px;margin:0 auto}
+.hero h1{font-size:clamp(28px,5vw,46px);line-height:1.15;margin:0 0 12px}
+.hero p{color:var(--muted);max-width:740px;margin:0 0 18px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font:12px var(--mono);padding:4px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+section{max-width:1000px;margin:0 auto;padding:40px 16px;border-top:1px solid var(--line)}
+section h2{margin:0 0 6px;font-size:26px}
+section h2 span{color:var(--accent);font:600 14px var(--mono);margin-right:10px}
+.lead{color:var(--muted);margin:0 0 20px;max-width:780px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:12px 0}
+button,select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.on{background:var(--accent);color:#04130f;border-color:var(--accent)}
+input[type=range],input[type=checkbox]{accent-color:var(--accent)}
+label{font-size:13px;color:var(--muted)}
+.note{font-size:13px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+svg text{font-family:system-ui,sans-serif}
+.badge{display:inline-block;font:12px var(--mono);padding:3px 10px;border-radius:6px;border:1px solid var(--line)}
+.badge.ok{background:#14532d;border-color:var(--good);color:#dcfce7}
+.badge.bad{background:#7f1d1d;border-color:var(--bad);color:#fee2e2}
+.badge.warn{background:#4a3a08;border-color:var(--accent2);color:#fef3c7}
+.msg{margin-top:10px;min-height:48px;font-size:14px}
+
+/* arch */
+.blk{cursor:pointer}
+.blk rect{fill:var(--panel2);stroke:var(--line);stroke-width:1.5;transition:.15s}
+.blk text{fill:var(--text);font-size:13px;text-anchor:middle;pointer-events:none}
+.blk:hover rect,.blk.sel rect{stroke:var(--accent);fill:#1d2a5c}
+.edge{fill:none;stroke:var(--muted);stroke-width:1.6;marker-end:url(#ah)}
+.edge.dash{stroke:var(--accent2);stroke-dasharray:6 4}
+#info{margin-top:12px;min-height:84px;background:var(--panel2)}
+#info h4{margin:0 0 4px;color:var(--accent)}
+
+/* fsm */
+.st rect{fill:var(--panel2);stroke:var(--line);stroke-width:1.5;transition:.2s}
+.st text{fill:var(--text);font-size:13px;text-anchor:middle;pointer-events:none}
+.st.cur rect{fill:var(--accent);stroke:var(--accent)}
+.st.cur text{fill:#04130f;font-weight:700}
+.st.err rect{stroke:var(--bad)}
+.st.cur.err rect{fill:var(--bad);stroke:var(--bad)}
+.st.cur.err text{fill:#210606}
+.fe{fill:none;stroke:var(--muted);stroke-width:1.6;marker-end:url(#ah)}
+.fe.d{stroke:var(--bad);stroke-dasharray:6 4}
+.stat{display:flex;gap:18px;flex-wrap:wrap;font:13px var(--mono);margin-top:8px}
+
+/* trace */
+table.tr{border-collapse:collapse;width:100%;font:12px var(--mono)}
+table.tr td,table.tr th{border:1px solid var(--line);padding:4px 6px;text-align:center;white-space:nowrap}
+table.tr th{color:var(--muted);font-weight:600;background:var(--panel2)}
+table.tr td.cur{background:#1d2a5c;color:#fff}
+table.tr td.fut{opacity:.25}
+table.tr td.loop{background:#4a1d1d}
+table.tr td.hot{color:var(--bad);font-weight:700}
+
+/* flits */
+#flits{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.fl{width:64px;height:64px;border-radius:10px;border:2px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;font:12px var(--mono);cursor:pointer;user-select:none;transition:.2s}
+.fl small{font-size:10px;opacity:.85}
+.fl.idle{background:transparent;color:var(--muted)}
+.fl.flight{background:#1e3a8a;border-color:var(--blue)}
+.fl.ok{background:#14532d;border-color:var(--good)}
+.fl.bad{background:#7f1d1d;border-color:var(--bad)}
+.fl.drop{background:#4a3a08;border-color:var(--accent2)}
+.fl.inj{outline:2px dashed var(--pink);outline-offset:2px}
+#flog{font:12px var(--mono);background:#0a0f22;border:1px solid var(--line);border-radius:10px;padding:10px;height:150px;overflow:auto;color:var(--muted)}
+
+/* abstraction */
+.bar{height:16px;border-radius:5px;background:var(--accent);transition:width .25s}
+.bar.a{background:var(--accent2)}
+.brow{display:grid;grid-template-columns:150px 1fr 60px;gap:10px;align-items:center;font:12px var(--mono);margin:6px 0}
+
+pre{background:#0a0f22;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;font:13px/1.5 var(--mono);margin:0}
+.k{color:#c084fc}.c{color:#6b7bb0}.s{color:#fbbf24}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:760px){.steps{grid-template-columns:1fr 1fr}}
+.stp{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13px}
+.stp b{display:block;color:var(--accent);margin-bottom:4px}
+footer{max-width:1000px;margin:0 auto;padding:30px 16px 60px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<nav>
+  <b>UCIe LTSM FORMAL</b>
+  <a href="#arch-s">Repo</a>
+  <a href="#fsm">LTSM</a>
+  <a href="#cex">Counterexample</a>
+  <a href="#crc">CRC / replay</a>
+  <a href="#abs">Abstraction</a>
+  <a href="#props">Properties + Tcl</a>
+</nav>
+
+<header class="hero">
+  <h1>UCIe Link Training<br>Formal Verification Series</h1>
+  <p>How do you prove a link can never get stuck, and that no flit is ever lost, duplicated or reordered? Step through a link training state machine, watch a liveness counterexample appear and disappear, replay a corrupted flit, and see why abstraction makes the proofs tractable.</p>
+  <div class="chips">
+    <span class="chip">JasperGold</span><span class="chip">SVA</span><span class="chip">Forward progress</span>
+    <span class="chip">Liveness</span><span class="chip">Data integrity</span><span class="chip">Abstraction</span>
+  </div>
+</header>
+
+<!-- 01 -->
+<section id="arch-s">
+  <h2><span>01</span>Repo and flow</h2>
+  <p class="lead">Two small designs, each with a checker bound on and a Tcl script that drives JasperGold. Click a block to see its role.</p>
+  <div class="card">
+    <svg viewBox="0 0 1000 330" style="width:100%;height:auto;display:block" role="img" aria-label="Repo structure">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8f9bc0"/></marker></defs>
+      <path class="edge" d="M170 100H230"/><path class="edge" d="M170 230H230"/>
+      <path class="edge dash" d="M390 100H450"/><path class="edge dash" d="M390 230H450"/>
+      <path class="edge" d="M610 100H690"/><path class="edge" d="M610 230H690"/>
+      <path class="edge" d="M850 165H870"/>
+      <g class="blk" data-b="ltsm"><rect x="20" y="70" width="150" height="60" rx="10"/><text x="95" y="105">LTSM FSM (rtl/)</text></g>
+      <g class="blk" data-b="crc"><rect x="20" y="200" width="150" height="60" rx="10"/><text x="95" y="235">CRC + replay (rtl/)</text></g>
+      <g class="blk" data-b="chk1"><rect x="230" y="70" width="160" height="60" rx="10"/><text x="310" y="105">Checker + bind</text></g>
+      <g class="blk" data-b="chk2"><rect x="230" y="200" width="160" height="60" rx="10"/><text x="310" y="235">Checker + bind</text></g>
+      <g class="blk" data-b="abs"><rect x="450" y="70" width="160" height="60" rx="10"/><text x="530" y="105">Abstractions</text></g>
+      <g class="blk" data-b="abs2"><rect x="450" y="200" width="160" height="60" rx="10"/><text x="530" y="235">Abstractions</text></g>
+      <g class="blk" data-b="tcl"><rect x="690" y="70" width="160" height="60" rx="10"/><text x="770" y="105">Tcl (scripts/)</text></g>
+      <g class="blk" data-b="tcl2"><rect x="690" y="200" width="160" height="60" rx="10"/><text x="770" y="235">Tcl (scripts/)</text></g>
+      <g class="blk" data-b="jg"><rect x="870" y="135" width="120" height="60" rx="10"/><text x="930" y="170">JasperGold</text></g>
+      <text x="20" y="300" fill="#8f9bc0" font-size="12">Dashed = verification attaches here. README documents learnings and diagrams.</text>
+    </svg>
+    <div id="info" class="card"></div>
+  </div>
+</section>
+
+<!-- 02 FSM -->
+<section id="fsm">
+  <h2><span>02</span>Link training state machine</h2>
+  <p class="lead">Training advances only when the remote partner responds. Switch off the partner, or the timeout, and watch the property that every state is eventually left break or hold.</p>
+  <div class="card">
+    <svg id="fsmsvg" viewBox="0 0 1000 320" style="width:100%;height:auto;display:block" role="img" aria-label="Link training state machine">
+      <path class="fe" d="M130 95H170"/><path class="fe" d="M290 95H330"/><path class="fe" d="M450 95H490"/>
+      <path class="fe" d="M610 95H650"/><path class="fe" d="M770 95H810"/>
+      <path class="fe" d="M870 120V255H770"/>
+      <path class="fe" d="M650 255H550V120"/>
+      <path class="fe d" d="M390 120V230"/>
+      <path class="fe" d="M330 255H70V120"/>
+      <text x="400" y="190" fill="#f87171" font-size="11">timeout / error</text>
+      <text x="880" y="190" fill="#8f9bc0" font-size="11">link error</text>
+      <g class="st" data-s="RESET"><rect x="10" y="70" width="120" height="50" rx="10"/><text x="70" y="100">RESET</text></g>
+      <g class="st" data-s="SBINIT"><rect x="170" y="70" width="120" height="50" rx="10"/><text x="230" y="100">SBINIT</text></g>
+      <g class="st" data-s="MBINIT"><rect x="330" y="70" width="120" height="50" rx="10"/><text x="390" y="100">MBINIT</text></g>
+      <g class="st" data-s="MBTRAIN"><rect x="490" y="70" width="120" height="50" rx="10"/><text x="550" y="100">MBTRAIN</text></g>
+      <g class="st" data-s="LINKINIT"><rect x="650" y="70" width="120" height="50" rx="10"/><text x="710" y="100">LINKINIT</text></g>
+      <g class="st" data-s="ACTIVE"><rect x="810" y="70" width="120" height="50" rx="10"/><text x="870" y="100">ACTIVE</text></g>
+      <g class="st err" data-s="TRAINERROR"><rect x="330" y="230" width="120" height="50" rx="10"/><text x="390" y="260">TRAINERROR</text></g>
+      <g class="st" data-s="PHYRETRAIN"><rect x="650" y="230" width="120" height="50" rx="10"/><text x="710" y="260">PHYRETRAIN</text></g>
+    </svg>
+    <div class="row">
+      <button id="fStep">Step</button>
+      <button id="fAuto">Auto-run</button>
+      <button id="fReset">↻ Reset</button>
+      <button id="fErr">Inject link error</button>
+      <label><input type="checkbox" id="peer" checked> Partner responds</label>
+      <label><input type="checkbox" id="tmo" checked> Timeout enabled</label>
+    </div>
+    <div class="stat"><span>state = <b id="sNow">RESET</b></span><span>wait timer = <b id="sTim">0</b>/4</span><span>steps = <b id="sCnt">0</b></span><span id="sBadge"></span></div>
+    <div class="msg" id="fMsg"></div>
+    <p class="note">State names follow the UCIe top-level link training flow. Substates inside MBINIT and MBTRAIN are collapsed here.</p>
+  </div>
+</section>
+
+<!-- 03 CEX -->
+<section id="cex">
+  <h2><span>03</span>Reading a liveness counterexample</h2>
+  <p class="lead">A safety failure is a bad state you can reach. A liveness failure is an infinite loop that never reaches a good outcome, so the counterexample is a lasso: a prefix, then a loop that repeats forever. Scrub the trace for the design without a timeout, then flip to the fix.</p>
+  <div class="card">
+    <div class="row" style="margin-top:0">
+      <button id="cxBug" class="on">No timeout (buggy)</button>
+      <button id="cxFix">With timeout (fixed)</button>
+      <label>Cycle <input type="range" id="cxSl" min="0" max="11" value="11"> <b id="cxN">11</b></label>
+      <span id="cxBadge"></span>
+    </div>
+    <div style="overflow:auto"><table class="tr" id="cxTab"></table></div>
+    <div class="msg" id="cxMsg"></div>
+  </div>
+</section>
+
+<!-- 04 CRC -->
+<section id="crc">
+  <h2><span>04</span>CRC and replay: data integrity</h2>
+  <p class="lead">Click flits to mark them as corrupted on their first transmission, then step. The receiver checks the CRC, requests a replay, and the scoreboard property says delivery must be complete, in order, with no duplicates.</p>
+  <div class="card">
+    <div class="row" style="margin-top:0">
+      <button id="cStep">Step</button>
+      <button id="cAuto">Auto-run</button>
+      <button id="cReset">↻ Reset</button>
+      <label><input type="checkbox" id="cBug"> Inject replay bug (replays from the wrong flit)</label>
+    </div>
+    <div id="flits"></div>
+    <div class="stat"><span>expected seq = <b id="cExp">0</b></span><span>sent through = <b id="cNext">0</b></span><span id="cBadge"></span></div>
+    <div id="flog"></div>
+    <p class="note">Legend: gray = not sent, blue = in flight, green = delivered in order, red = CRC fail, amber = discarded as out of order. Dashed pink outline = corruption injected.</p>
+  </div>
+</section>
+
+<!-- 05 ABS -->
+<section id="abs">
+  <h2><span>05</span>Abstraction: shrinking the state space</h2>
+  <p class="lead">Formal engines struggle when state is wide. You can often replace wide, irrelevant state with a small stand-in that preserves the property. Toggle the techniques and watch the bits of state drop.</p>
+  <div class="card">
+    <div class="row" style="margin-top:0">
+      <label><input type="checkbox" id="aTim"> Counter abstraction (timeout counter)</label>
+      <label><input type="checkbox" id="aCrc"> Replace CRC with a "bad" flag</label>
+      <label><input type="checkbox" id="aDat"> Data coloring (track one tagged flit)</label>
+      <label>Timeout width <input type="range" id="aW" min="4" max="20" value="16"> <b id="aWv">16</b> bits</label>
+    </div>
+    <div id="aBars"></div>
+    <div class="msg" id="aMsg"></div>
+    <p class="note">Bit counts are a teaching model of one plausible design, not measured numbers from the repo.</p>
+  </div>
+</section>
+
+<!-- 06 PROPS -->
+<section id="props">
+  <h2><span>06</span>Properties and Tcl</h2>
+  <p class="lead">The properties behind the demos above, and the script shape that proves them.</p>
+  <div class="card">
+    <div class="tabs" id="ptabs">
+      <button data-t="live" class="on">Liveness</button>
+      <button data-t="safe">Safety / integrity</button>
+      <button data-t="cover">Cover</button>
+      <button data-t="tcl">Tcl</button>
+    </div>
+    <pre id="pcode"></pre>
+    <p class="note">Snippets are illustrative. Rename signals and parameters to match your RTL and checker.</p>
+  </div>
+  <div class="steps" style="margin-top:18px">
+    <div class="stp"><b>1 · Cover first</b>Prove ACTIVE and replay are reachable so proofs are not vacuous.</div>
+    <div class="stp"><b>2 · Assume carefully</b>Fairness on the partner is an assumption. Over-constraining hides bugs.</div>
+    <div class="stp"><b>3 · Prove, read cex</b>Every cex is a lasso or a bad state. Fix the RTL or the assumption.</div>
+    <div class="stp"><b>4 · Abstract, re-prove</b>Shrink counters and data, then check coverage still holds.</div>
+  </div>
+</section>
+
+<footer>
+  Source: <a href="https://github.com/SarangKudtarkar/ucie_ltsm_formal_repo">github.com/SarangKudtarkar/ucie_ltsm_formal_repo</a> · State names, timings and snippets are teaching examples.
+</footer>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+
+/* 01 repo */
+const B={
+ ltsm:['Link training FSM','RTL for the top-level training sequence: RESET, SBINIT, MBINIT, MBTRAIN, LINKINIT, ACTIVE, plus TRAINERROR and PHYRETRAIN. The property of interest is forward progress.'],
+ crc:['CRC and replay path','Flits carry a sequence number and CRC. A bad CRC triggers a replay from the receiver\'s expected sequence. The property of interest is data integrity.'],
+ chk1:['LTSM checker + bind','A checker module holding assertions, assumptions and covers, bound onto the FSM so the RTL stays untouched.'],
+ chk2:['Replay checker + bind','Tracks expected sequence and delivered flits and asserts in-order, no-loss, no-duplicate delivery.'],
+ abs:['LTSM abstractions','Counter abstraction for the wait timer so the proof does not depend on the timeout width.'],
+ abs2:['Replay abstractions','CRC replaced by a free good/bad flag and data tracked by coloring, so wide payload state drops out.'],
+ tcl:['Tcl scripts','Analyze, elaborate, set clock and reset, apply abstractions and assumptions, prove, then report and measure coverage.'],
+ tcl2:['Tcl scripts','Same flow for the replay design, plus cover properties to show replays actually happen.'],
+ jg:['JasperGold','Proves each property for all inputs or returns a counterexample waveform. Results: proven, cex, bounded, covered, unreachable.']
+};
+function showB(k){$$('.blk').forEach(n=>n.classList.toggle('sel',n.dataset.b===k));$('#info').innerHTML='<h4>'+B[k][0]+'</h4>'+B[k][1];}
+$$('.blk').forEach(n=>n.addEventListener('click',()=>showB(n.dataset.b)));showB('ltsm');
+
+/* 02 FSM */
+(function(){
+ const NEXT={RESET:'SBINIT',SBINIT:'MBINIT',MBINIT:'MBTRAIN',MBTRAIN:'LINKINIT',LINKINIT:'ACTIVE',PHYRETRAIN:'MBTRAIN',TRAINERROR:'RESET'};
+ const T=4; let cur='RESET',timer=0,steps=0,stuck=0,auto=null;
+ function render(msg){
+  $$('#fsmsvg .st').forEach(n=>n.classList.toggle('cur',n.dataset.s===cur));
+  $('#sNow').textContent=cur;$('#sTim').textContent=timer;$('#sCnt').textContent=steps;
+  const peer=$('#peer').checked,tmo=$('#tmo').checked;
+  let b='';
+  if(cur==='ACTIVE') b='<span class="badge ok">training complete</span>';
+  else if(!peer&&!tmo&&stuck>=T+2) b='<span class="badge bad">liveness FAILS</span>';
+  else b='<span class="badge warn">running</span>';
+  $('#sBadge').innerHTML=b;
+  if(msg!==undefined) $('#fMsg').innerHTML=msg;
+ }
+ function go(s){cur=s;timer=0;}
+ function step(){
+  steps++;
+  const peer=$('#peer').checked,tmo=$('#tmo').checked;
+  if(cur==='ACTIVE'){render('<b>ACTIVE</b> is the goal state. Use "Inject link error" to force retraining.');return;}
+  if(cur==='RESET'||cur==='TRAINERROR'){const f=cur;go(NEXT[cur]);stuck=0;render('<b>'+f+'</b> → <b>'+cur+'</b> unconditionally.');return;}
+  if(peer){const f=cur;go(NEXT[cur]);stuck=0;render('Partner acked. <b>'+f+'</b> → <b>'+cur+'</b>.');return;}
+  timer++;stuck++;
+  if(tmo&&timer>=T){const f=cur;go('TRAINERROR');render('Timer hit '+T+' with no ack. <b>'+f+'</b> → <b>TRAINERROR</b>. Every state is still left, so <span class="mono">s_eventually(state != X)</span> holds.');return;}
+  if(!tmo&&stuck>=T+2){render('<b>'+cur+'</b> waits forever. The property <span class="mono">state==X |-> s_eventually(state!=X)</span> fails: the loop never exits. This is the lasso a liveness counterexample shows.');return;}
+  render('Waiting for the partner in <b>'+cur+'</b> (timer '+timer+').');
+ }
+ $('#fStep').addEventListener('click',step);
+ $('#fReset').addEventListener('click',()=>{cur='RESET';timer=0;steps=0;stuck=0;render('Reset.');});
+ $('#fErr').addEventListener('click',()=>{if(cur==='ACTIVE'){go('PHYRETRAIN');render('Link error in ACTIVE. <b>ACTIVE</b> → <b>PHYRETRAIN</b>, then back to MBTRAIN once the partner responds.');}else render('Link errors are only injected from ACTIVE. Let training finish first.');});
+ $('#fAuto').addEventListener('click',e=>{
+  if(auto){clearInterval(auto);auto=null;e.target.classList.remove('on');e.target.textContent='Auto-run';}
+  else{auto=setInterval(step,650);e.target.classList.add('on');e.target.textContent='Stop';}
+ });
+ $('#peer').addEventListener('change',()=>{stuck=0;render();});$('#tmo').addEventListener('change',()=>{stuck=0;render();});
+ render('Press Step. Try switching off "Partner responds" with and without the timeout.');
+})();
+
+/* 03 counterexample */
+(function(){
+ const N=12;
+ const D={
+  bug:{st:['RESET','SBINIT','SBINIT','SBINIT','SBINIT','SBINIT','SBINIT','SBINIT','SBINIT','SBINIT','SBINIT','SBINIT'],
+       tim:[0,0,1,2,3,3,3,3,3,3,3,3],ack:[0,0,0,0,0,0,0,0,0,0,0,0],loop:2},
+  fix:{st:['RESET','SBINIT','SBINIT','SBINIT','SBINIT','SBINIT','TRAINERROR','RESET','SBINIT','SBINIT','SBINIT','SBINIT'],
+       tim:[0,0,1,2,3,4,0,0,0,1,2,3],ack:[0,0,0,0,0,0,0,0,0,0,0,0],loop:-1}
+ };
+ let mode='bug';
+ function draw(){
+  const d=D[mode],c=+$('#cxSl').value;$('#cxN').textContent=c;
+  const rows=[['cycle',i=>i],['state',i=>d.st[i]],['partner_ack',i=>d.ack[i]],['timer',i=>d.tim[i]]];
+  let h='';
+  rows.forEach(([n,f])=>{
+   h+='<tr><th>'+n+'</th>';
+   for(let i=0;i<N;i++){
+    let cl=i===c?'cur':(i>c?'fut':'');
+    if(mode==='bug'&&i>=d.loop&&i<=c&&n!=='cycle')cl+=' loop';
+    if(n==='state'&&d.st[i]==='TRAINERROR')cl+=' hot';
+    h+='<td class="'+cl+'">'+f(i)+'</td>';
+   }
+   h+='</tr>';
+  });
+  $('#cxTab').innerHTML=h;
+  if(mode==='bug'){
+   $('#cxBadge').innerHTML='<span class="badge bad">a_fp_sbinit: CEX</span>';
+   $('#cxMsg').innerHTML=c<2?'Prefix: the design leaves RESET and enters SBINIT.':'From cycle 2 the state repeats with the timer saturated and no ack. This <b>loop</b> (shaded) can repeat forever, so the engine reports a counterexample to <span class="mono">s_eventually(state != SBINIT)</span>.';
+  } else {
+   $('#cxBadge').innerHTML='<span class="badge ok">a_fp_sbinit: proven</span>';
+   $('#cxMsg').innerHTML=c<6?'The timer counts up while the partner stays silent.':'Timer reaches 4, the FSM goes to <b>TRAINERROR</b>, then RESET and tries again. SBINIT is always left, so the property is proven.';
+  }
+ }
+ function set(m){mode=m;$('#cxBug').classList.toggle('on',m==='bug');$('#cxFix').classList.toggle('on',m==='fix');draw();}
+ $('#cxBug').addEventListener('click',()=>set('bug'));$('#cxFix').addEventListener('click',()=>set('fix'));
+ $('#cxSl').addEventListener('input',draw);draw();
+})();
+
+/* 04 CRC / replay */
+(function(){
+ const N=8; let st,ch,next,exp,corrupt,stuckFlag,auto=null,done;
+ const logEl=$('#flog'),fl=$('#flits');
+ function init(){
+  st=Array(N).fill('idle');ch=[];next=0;exp=0;stuckFlag=false;done=false;logEl.innerHTML='';
+  if(!corrupt)corrupt=new Set([3]);
+  drawF();
+ }
+ function log(t){logEl.innerHTML+=t+'<br>';logEl.scrollTop=logEl.scrollHeight;}
+ function drawF(){
+  fl.innerHTML='';
+  for(let i=0;i<N;i++){
+   const d=document.createElement('div');
+   d.className='fl '+st[i]+(corrupt.has(i)?' inj':'');
+   d.innerHTML='#'+i+'<small>'+(corrupt.has(i)?'bad CRC':'')+'</small>';
+   d.title='Click to toggle corruption on first transmission';
+   d.addEventListener('click',()=>{if(next>i)return;corrupt.has(i)?corrupt.delete(i):corrupt.add(i);drawF();});
+   fl.appendChild(d);
+  }
+  $('#cExp').textContent=exp;$('#cNext').textContent=next;
+  let b='<span class="badge warn">running</span>';
+  if(done)b='<span class="badge ok">integrity holds: all '+N+' delivered in order</span>';
+  if(stuckFlag)b='<span class="badge bad">integrity VIOLATED: flit #'+exp+' never delivered</span>';
+  $('#cBadge').innerHTML=b;
+ }
+ function step(){
+  if(done||stuckFlag)return;
+  let rewind=false;
+  if(ch.length){
+   const f=ch.shift();
+   if(f.bad){st[f.s]='bad';log('rx: CRC fail on #'+f.s+' → NAK, request replay from #'+exp);corrupt.delete(f.s);rewind=true;}
+   else if(f.s===exp){st[f.s]='ok';exp++;log('rx: delivered #'+f.s+' in order');}
+   else{st[f.s]='drop';log('rx: #'+f.s+' out of order (expected #'+exp+') → discard');}
+  }
+  if(rewind){
+   ch.forEach(f=>{if(st[f.s]==='flight')st[f.s]='idle';});ch=[];
+   const bug=$('#cBug').checked;next=bug?exp+1:exp;
+   for(let i=exp;i<N;i++){if(!(bug&&i===exp)&&st[i]!=='ok')st[i]='idle';}
+   log('tx: rewind to #'+next+(bug?'  (BUG: skips #'+exp+')':''));
+  } else if(next<N&&ch.length<2){
+   ch.push({s:next,bad:corrupt.has(next)});st[next]='flight';log('tx: send #'+next);next++;
+  }
+  if(exp>=N){done=true;log('scoreboard: all '+N+' flits delivered in order ✓');}
+  else if(next>=N&&ch.length===0&&!rewind){stuckFlag=true;log('scoreboard: nothing left in flight, #'+exp+' still missing ✗');}
+  drawF();
+ }
+ $('#cStep').addEventListener('click',step);
+ $('#cReset').addEventListener('click',()=>{corrupt=new Set([3]);init();});
+ $('#cAuto').addEventListener('click',e=>{
+  if(auto){clearInterval(auto);auto=null;e.target.classList.remove('on');e.target.textContent='Auto-run';}
+  else{auto=setInterval(step,550);e.target.classList.add('on');e.target.textContent='Stop';}
+ });
+ init();
+})();
+
+/* 05 abstraction */
+(function(){
+ function calc(){
+  const W=+$('#aW').value;$('#aWv').textContent=W;
+  const at=$('#aTim').checked,ac=$('#aCrc').checked,ad=$('#aDat').checked;
+  const items=[
+   ['FSM state',3,3],
+   ['Timeout counter',W,at?2:W],
+   ['CRC register',32,ac?1:32],
+   ['Flit payload',64,ad?1:64],
+   ['Seq counters',8,8]
+  ];
+  let tot=0,max=0;items.forEach(i=>{tot+=i[2];max+=i[1];});
+  let h='';
+  items.forEach(i=>{
+   const cls=i[2]<i[1]?'bar a':'bar';
+   h+='<div class="brow"><span>'+i[0]+'</span><div style="background:#0a0f22;border-radius:5px"><div class="'+cls+'" style="width:'+(i[2]/64*100)+'%"></div></div><span>'+i[2]+' b</span></div>';
+  });
+  h+='<div class="brow"><b>Total state</b><span></span><b>'+tot+' b</b></div>';
+  $('#aBars').innerHTML=h;
+  const red=max-tot;
+  $('#aMsg').innerHTML=red===0?'No abstraction applied: <b>'+tot+'</b> bits of state. Proof effort depends on all of it, including the timeout width.':'Removed <b>'+red+'</b> bits of state ('+Math.round(red/max*100)+'% less). The proof no longer depends on the timeout width or the payload, only on the behavior the property cares about. Re-run coverage afterwards to confirm the abstraction did not make states unreachable.';
+ }
+ ['#aTim','#aCrc','#aDat'].forEach(s=>$(s).addEventListener('change',calc));$('#aW').addEventListener('input',calc);calc();
+})();
+
+/* 06 props */
+(function(){
+ const C={
+live:`<span class="c">// Forward progress: no state is occupied forever</span>
+a_fp_sbinit: <span class="k">assert property</span> (@(<span class="k">posedge</span> clk) <span class="k">disable iff</span> (!rst_n)
+  (state == SBINIT) |-&gt; s_eventually (state != SBINIT));
+
+a_fp_mbtrain: <span class="k">assert property</span> (@(<span class="k">posedge</span> clk) <span class="k">disable iff</span> (!rst_n)
+  (state == MBTRAIN) |-&gt; s_eventually (state != MBTRAIN));
+
+<span class="c">// Bounded recovery: silence for T cycles ends in TRAINERROR</span>
+a_timeout: <span class="k">assert property</span> (@(<span class="k">posedge</span> clk) <span class="k">disable iff</span> (!rst_n)
+  ((state == SBINIT) &amp;&amp; !partner_ack) [*T] |=&gt; (state == TRAINERROR));
+
+<span class="c">// Fairness: only valid if you want to prove reaching ACTIVE</span>
+asm_partner_fair: <span class="k">assume property</span> (@(<span class="k">posedge</span> clk)
+  req |-&gt; s_eventually partner_ack);`,
+safe:`<span class="c">// Data integrity on the replay path</span>
+a_in_order: <span class="k">assert property</span> (@(<span class="k">posedge</span> clk) <span class="k">disable iff</span> (!rst_n)
+  rx_deliver |-&gt; (rx_seq == exp_seq));
+
+a_no_dup: <span class="k">assert property</span> (@(<span class="k">posedge</span> clk) <span class="k">disable iff</span> (!rst_n)
+  rx_deliver |=&gt; (exp_seq == $past(exp_seq) + 1));
+
+<span class="c">// A CRC failure must lead to a replay of the same sequence</span>
+a_replay: <span class="k">assert property</span> (@(<span class="k">posedge</span> clk) <span class="k">disable iff</span> (!rst_n)
+  crc_bad |-&gt; s_eventually (tx_valid &amp;&amp; tx_seq == exp_seq));
+
+<span class="c">// Coloring: track a single tagged flit end to end</span>
+a_tagged_delivered: <span class="k">assert property</span> (@(<span class="k">posedge</span> clk) <span class="k">disable iff</span> (!rst_n)
+  tag_sent |-&gt; s_eventually tag_delivered);`,
+cover:`<span class="c">// Make sure proofs are not vacuous</span>
+c_reach_active: <span class="k">cover property</span> (@(<span class="k">posedge</span> clk) state == ACTIVE);
+c_phyretrain:   <span class="k">cover property</span> (@(<span class="k">posedge</span> clk) state == PHYRETRAIN ##[1:$] state == ACTIVE);
+c_timeout_path: <span class="k">cover property</span> (@(<span class="k">posedge</span> clk) state == TRAINERROR ##1 state == RESET);
+c_replay_done:  <span class="k">cover property</span> (@(<span class="k">posedge</span> clk) crc_bad ##[1:$] rx_deliver);`,
+tcl:`<span class="c"># JasperGold flow (illustrative)</span>
+clear -all
+analyze -sv12 rtl/ltsm.sv formal/ltsm_checker.sv formal/ltsm_bind.sv
+elaborate -top ltsm
+clock clk
+reset -expression {!rst_n}
+
+<span class="c"># abstraction: replace the wait timer with a small counter model</span>
+abstract -counter ltsm.wait_timer
+
+<span class="c"># assumptions, then proofs</span>
+prove -all
+set_prove_time_limit 600s
+prove -property {a_fp_*}
+
+<span class="c"># results and coverage</span>
+report -summary
+check_cov -measure -type {stimuli checker}`
+ };
+ function show(t){$$('#ptabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));$('#pcode').innerHTML=C[t];}
+ $$('#ptabs button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.t)));show('live');
+})();
+</script>
+</body>
+</html>
